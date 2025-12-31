@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Power,
@@ -20,7 +21,8 @@ import {
     Wind,
     ArrowRight,
     Trash2,
-    Layers
+    Layers,
+    Activity
 } from 'lucide-react';
 import { AppConfig, ProxyConfig } from '../types/config';
 import HelpTooltip from '../components/common/HelpTooltip';
@@ -123,6 +125,7 @@ function CollapsibleCard({
 
 export default function ApiProxy() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
 
     const models = [
         // Gemini 3 Series
@@ -573,17 +576,28 @@ print(response.text)`;
                             </div>
 
                             {/* 控制按钮 */}
-                            <button
-                                onClick={handleToggle}
-                                disabled={loading || !appConfig}
-                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 ${status.running
-                                    ? 'bg-red-50 to-red-600 text-red-600 hover:bg-red-100 border border-red-200'
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/30'
-                                    } ${(loading || !appConfig) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <Power size={14} />
-                                {loading ? t('proxy.status.processing') : (status.running ? t('proxy.action.stop') : t('proxy.action.start'))}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {status.running && (
+                                    <button
+                                        onClick={() => navigate('/monitor')}
+                                        className="px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 border bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-blue-600"
+                                    >
+                                        <Activity size={14} />
+                                        {t('monitor.open_monitor')}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleToggle}
+                                    disabled={loading || !appConfig}
+                                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 ${status.running
+                                        ? 'bg-red-50 to-red-600 text-red-600 hover:bg-red-100 border border-red-200'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/30'
+                                        } ${(loading || !appConfig) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <Power size={14} />
+                                    {loading ? t('proxy.status.processing') : (status.running ? t('proxy.action.stop') : t('proxy.action.start'))}
+                                </button>
+                            </div>
                         </div>
                         <div className="p-3 space-y-3">
                             {/* 监听端口、超时和自启动 */}
