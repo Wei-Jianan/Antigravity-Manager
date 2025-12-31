@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
 import { Trash2, Search, X } from 'lucide-react';
 import { AppConfig } from '../../types/config';
+import { formatCompactNumber } from '../../utils/format';
 
 interface ProxyRequestLog {
     id: string;
@@ -93,12 +94,14 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
         return () => { if (unlistenFn) unlistenFn(); };
     }, []);
 
-    const filteredLogs = logs.filter(log => 
-        log.url.toLowerCase().includes(filter.toLowerCase()) || 
-        log.method.toLowerCase().includes(filter.toLowerCase()) ||
-        (log.model && log.model.toLowerCase().includes(filter.toLowerCase())) ||
-        log.status.toString().includes(filter)
-    );
+    const filteredLogs = logs
+        .filter(log => 
+            log.url.toLowerCase().includes(filter.toLowerCase()) || 
+            log.method.toLowerCase().includes(filter.toLowerCase()) ||
+            (log.model && log.model.toLowerCase().includes(filter.toLowerCase())) ||
+            log.status.toString().includes(filter)
+        )
+        .sort((a, b) => b.timestamp - a.timestamp);
 
     const quickFilters = [
         { label: t('monitor.filters.all'), value: '' },
@@ -163,9 +166,9 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                     </div>
 
                     <div className="hidden lg:flex gap-4 text-[10px] font-bold uppercase">
-                        <span className="text-blue-500">{stats.total_requests} REQS</span>
-                        <span className="text-green-500">{stats.success_count} OK</span>
-                        <span className="text-red-500">{stats.error_count} ERR</span>
+                        <span className="text-blue-500">{formatCompactNumber(stats.total_requests)} REQS</span>
+                        <span className="text-green-500">{formatCompactNumber(stats.success_count)} OK</span>
+                        <span className="text-red-500">{formatCompactNumber(stats.error_count)} ERR</span>
                     </div>
 
                     <button onClick={clearLogs} className="btn btn-sm btn-ghost text-gray-400">
@@ -205,8 +208,8 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                 <td className="text-blue-600 truncate max-w-[180px]">{log.model || '-'}</td>
                                 <td className="truncate max-w-[240px]">{log.url}</td>
                                 <td className="text-right text-[9px]">
-                                    {log.input_tokens != null && <div>I: {log.input_tokens}</div>}
-                                    {log.output_tokens != null && <div>O: {log.output_tokens}</div>}
+                                    {log.input_tokens != null && <div>I: {formatCompactNumber(log.input_tokens)}</div>}
+                                    {log.output_tokens != null && <div>O: {formatCompactNumber(log.output_tokens)}</div>}
                                 </td>
                                 <td className="text-right">{log.duration}ms</td>
                                 <td className="text-right text-[10px]">{new Date(log.timestamp).toLocaleTimeString()}</td>
@@ -245,8 +248,8 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                     <div className="space-y-1.5">
                                         <span className="block text-gray-500 dark:text-slate-400 uppercase font-black text-[10px] tracking-widest">{t('monitor.details.tokens')}</span>
                                         <div className="font-mono text-[11px] flex gap-2">
-                                            <span className="text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/50 font-bold">In: {selectedLog.input_tokens ?? 0}</span>
-                                            <span className="text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40 px-2.5 py-1 rounded-md border border-green-200 dark:border-green-800/50 font-bold">Out: {selectedLog.output_tokens ?? 0}</span>
+                                            <span className="text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/50 font-bold">In: {formatCompactNumber(selectedLog.input_tokens ?? 0)}</span>
+                                            <span className="text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40 px-2.5 py-1 rounded-md border border-green-200 dark:border-green-800/50 font-bold">Out: {formatCompactNumber(selectedLog.output_tokens ?? 0)}</span>
                                         </div>
                                     </div>
                                 </div>
