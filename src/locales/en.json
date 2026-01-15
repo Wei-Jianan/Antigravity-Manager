@@ -667,7 +667,17 @@
         "dialog": {
             "clear_title": "Clear Proxy Logs",
             "clear_msg": "Are you sure you want to clear all proxy logs? This action cannot be undone."
-        }
+        },
+        "pagination": {
+            "per_page": "Per page",
+            "page": "Page",
+            "pages": "",
+            "total": "Total",
+            "records": "records"
+        },
+        "export": "Export",
+        "export_all": "Export all logs",
+        "export_success": "Successfully exported {{count}} records"
     },
     "update_notification": {
         "title": "New Version Available",

@@ -667,7 +667,17 @@
         "dialog": {
             "clear_title": "清除监控日志",
             "clear_msg": "确定要清除所有监控记录吗？此操作无法撤销。"
-        }
+        },
+        "pagination": {
+            "per_page": "每页",
+            "page": "第",
+            "pages": "页",
+            "total": "共",
+            "records": "条记录"
+        },
+        "export": "导出",
+        "export_all": "导出全部日志",
+        "export_success": "成功导出 {{count}} 条记录"
     },
     "update_notification": {
         "title": "发现新版本",
