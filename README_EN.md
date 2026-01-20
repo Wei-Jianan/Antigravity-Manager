@@ -235,6 +235,13 @@ print(response.choices[0].message.content)
             -   **Thinking Model Optimization**: Resolved mandatory error issues with Claude 3.7 Thinking models when thought chains are missing in historical messages, implementing intelligent protocol fallback and placeholder block injection.
             -   **Protocol Completion**: Enhanced OpenAI Legacy endpoints with Token usage statistics and Header injection. Added support for `input_text` content blocks and mapped the `developer` role to system instructions.
             -   **requestId Unification**: Unified `requestId` prefix to `agent-` across all OpenAI paths to resolve ID recognition issues with some clients. interface response bodies, resolving the issue where token consumption was not displayed in traffic logs.
+        -   **[Core Fix] JSON Schema Array Recursive Cleaning Fix (Resolution of Gemini API 400 Errors)**:
+            -   **Background**: Gemini API does not support JSON Schema fields like `propertyNames` and `const`. Although whitelist filtering logic was in place, the `clean_json_schema_recursive` function lacked recursive handling for `Value::Array` types, causing illegal fields nested within `anyOf`, `oneOf`, or `items` arrays to escape cleaning, triggering `Invalid JSON payload received. Unknown name "propertyNames"/"const"` errors.
+            -   **Fix Details**:
+                - **Added Recursive Cleaning Before anyOf/oneOf Merging**: Recursively cleans each branch's content before merging `anyOf`/`oneOf` branches, ensuring merged branches are already cleaned and preventing illegal fields from escaping during the merge process.
+                - **Added Generic Array Recursive Processing Branch**: Added a `Value::Array` branch to the `match` statement, ensuring all array-type values (including `items`, `enum`, etc.) are recursively cleaned, covering all array fields that may contain Schema definitions.
+            -   **Test Verification**: Added 3 test cases to verify the fix. All 14 tests passed with no regressions.
+            -   **Impact**: Resolved 400 errors caused by nested array structures in complex tool definitions (such as MCP tools), ensuring 100% Gemini API compatibility.
         -   **[System Consistency] Unified requestId Prefixes**:
             -   **Fix Details**: Unified the `requestId` prefix for OpenAI paths from `openai-` to `agent-`, ensuring high consistency with Claude protocol characteristics and improving upstream compatibility.
     *   **v3.3.45 (2026-01-19)**:
