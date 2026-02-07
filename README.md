@@ -149,6 +149,7 @@ brew install --cask antigravity-tools
 *   **macOS**: `.dmg` (支持 Apple Silicon & Intel)
 *   **Windows**: `.msi` 或 便携版 `.zip`
 *   **Linux**: `.deb` 或 `AppImage`
+如需从源码构建 Windows 安装包，请参考 `docs/WINDOWS_BUILD.md`。
 
 ### 选项 C: Docker 部署 (推荐用于 NAS/服务器)
 如果您希望在容器化环境中运行，我们提供了原生的 Docker 镜像。该镜像内置了对 v4.0.2 原生 Headless 架构的支持，可自动托管前端静态资源，并通过浏览器直接进行管理。

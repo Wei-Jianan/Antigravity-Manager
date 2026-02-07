@@ -8,16 +8,16 @@ use serde_json::Value;
 use tokio::time::Duration;
 use tokio::sync::RwLock;
 
-// Cloud Code v1internal endpoints (fallback order: Sandbox → Daily → Prod)
-// 优先使用 Sandbox/Daily 环境以避免 Prod环境的 429 错误 (Ref: Issue #1176)
+// Cloud Code v1internal endpoints (fallback order: Daily → Prod → Sandbox)
+// 与 Antigravity Cockpit 对齐，优先使用 Daily/Prod 以减少部分环境下的 403 命中率。
 const V1_INTERNAL_BASE_URL_PROD: &str = "https://cloudcode-pa.googleapis.com/v1internal";
 const V1_INTERNAL_BASE_URL_DAILY: &str = "https://daily-cloudcode-pa.googleapis.com/v1internal";
 const V1_INTERNAL_BASE_URL_SANDBOX: &str = "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal";
 
 const V1_INTERNAL_BASE_URL_FALLBACKS: [&str; 3] = [
-    V1_INTERNAL_BASE_URL_SANDBOX, // 优先级 1: Sandbox (已知有效且稳定)
-    V1_INTERNAL_BASE_URL_DAILY,   // 优先级 2: Daily (备用)
-    V1_INTERNAL_BASE_URL_PROD,    // 优先级 3: Prod (仅作为兜底)
+    V1_INTERNAL_BASE_URL_DAILY,   // 优先级 1: Daily
+    V1_INTERNAL_BASE_URL_PROD,    // 优先级 2: Prod
+    V1_INTERNAL_BASE_URL_SANDBOX, // 优先级 3: Sandbox (兜底)
 ];
 
 pub struct UpstreamClient {
@@ -144,6 +144,7 @@ impl UpstreamClient {
         status == StatusCode::TOO_MANY_REQUESTS
             || status == StatusCode::REQUEST_TIMEOUT
             || status == StatusCode::NOT_FOUND
+            || status == StatusCode::FORBIDDEN
             || status.is_server_error()
     }
 

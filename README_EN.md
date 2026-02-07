@@ -150,6 +150,7 @@ Download from [GitHub Releases](https://github.com/lbjlaq/Antigravity-Manager/re
 *   **macOS**: `.dmg` (Universal, Apple Silicon & Intel)
 *   **Windows**: `.msi` or portable `.zip`
 *   **Linux**: `.deb` or `AppImage`
+If you need to build a Windows installer from source, see `docs/WINDOWS_BUILD.md`.
 
 ### Option C: Docker Deployment (Recommended for NAS/Servers)
 If you prefer running in a containerized environment, we provide a native Docker image. This image supports the v4.0.3 Native Headless architecture, automatically hosts frontend static resources, and allows for direct browser-based management.

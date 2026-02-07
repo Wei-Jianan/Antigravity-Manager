@@ -52,6 +52,11 @@ pub struct TokenManager {
     cancel_token: CancellationToken,
 }
 
+fn generate_fallback_project_id() -> String {
+    let random = uuid::Uuid::new_v4().simple().to_string();
+    format!("projects/random-{}/locations/global", &random[..8])
+}
+
 impl TokenManager {
     /// 创建新的 TokenManager
     pub fn new(data_dir: PathBuf) -> Self {
@@ -1191,7 +1196,7 @@ impl TokenManager {
                                 let _ = self.save_project_id(&token.account_id, &pid).await;
                                 pid
                             }
-                            Err(_) => "bamboo-precept-lgxtn".to_string(), // fallback
+                            Err(_) => generate_fallback_project_id(),
                         }
                     };
 
@@ -1711,7 +1716,7 @@ impl TokenManager {
             None => return Err(format!("未找到账号: {}", email)),
         };
 
-        let project_id = project_id_opt.unwrap_or_else(|| "bamboo-precept-lgxtn".to_string());
+        let project_id = project_id_opt.unwrap_or_else(generate_fallback_project_id);
 
         // 检查是否过期 (提前5分钟)
         if now < timestamp + expires_in - 300 {
@@ -2232,7 +2237,7 @@ impl TokenManager {
         // 2. 获取项目 ID (Project ID)
         let project_id = crate::proxy::project_resolver::fetch_project_id(&token_info.access_token)
             .await
-            .unwrap_or_else(|_| "bamboo-precept-lgxtn".to_string()); // Fallback
+            .unwrap_or_else(|_| generate_fallback_project_id());
 
         // 3. 委托给 modules::account::add_account 处理 (包含文件写入、索引更新、锁)
         let email_clone = email.to_string();

@@ -1,10 +1,16 @@
 use reqwest;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use crate::models::QuotaData;
 use crate::modules::config;
 
-const QUOTA_API_URL: &str = "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels";
+const QUOTA_API_PATH: &str = "/v1internal:fetchAvailableModels";
+const LOAD_CODE_ASSIST_PATH: &str = "/v1internal:loadCodeAssist";
+const CLOUD_CODE_BASE_URLS: [&str; 3] = [
+    "https://daily-cloudcode-pa.googleapis.com",
+    "https://cloudcode-pa.googleapis.com",
+    "https://daily-cloudcode-pa.sandbox.googleapis.com",
+];
 
 /// Critical retry threshold: considered near recovery when quota reaches 95%
 const NEAR_READY_THRESHOLD: i32 = 95;
@@ -33,7 +39,7 @@ struct QuotaInfo {
 #[derive(Debug, Deserialize)]
 struct LoadProjectResponse {
     #[serde(rename = "cloudaicompanionProject")]
-    project_id: Option<String>,
+    project: Option<Value>,
     #[serde(rename = "currentTier")]
     current_tier: Option<Tier>,
     #[serde(rename = "paidTier")]
@@ -70,53 +76,94 @@ async fn create_warmup_client(account_id: Option<&str>) -> reqwest::Client {
     }
 }
 
-const CLOUD_CODE_BASE_URL: &str = "https://daily-cloudcode-pa.sandbox.googleapis.com";
+fn generate_fallback_project_id() -> String {
+    let random = uuid::Uuid::new_v4().simple().to_string();
+    format!("projects/random-{}/locations/global", &random[..8])
+}
+
+fn extract_project_id(project: Option<&Value>) -> Option<String> {
+    match project {
+        Some(Value::String(id)) if !id.is_empty() => Some(id.clone()),
+        Some(Value::Object(obj)) => obj
+            .get("id")
+            .and_then(|v| v.as_str())
+            .filter(|id| !id.is_empty())
+            .map(|id| id.to_string()),
+        _ => None,
+    }
+}
 
 /// Fetch project ID and subscription tier
 async fn fetch_project_id(access_token: &str, email: &str, account_id: Option<&str>) -> (Option<String>, Option<String>) {
     let client = create_client(account_id).await;
-    let meta = json!({"metadata": {"ideType": "ANTIGRAVITY"}});
+    let meta = json!({
+        "metadata": {
+            "ideType": "ANTIGRAVITY",
+            "platform": "PLATFORM_UNSPECIFIED",
+            "pluginType": "GEMINI"
+        }
+    });
+    let mut subscription_tier: Option<String> = None;
 
-    let res = client
-        .post(format!("{}/v1internal:loadCodeAssist", CLOUD_CODE_BASE_URL))
-        .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", access_token))
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .header(reqwest::header::USER_AGENT, crate::constants::USER_AGENT.as_str())
-        .json(&meta)
-        .send()
-        .await;
+    for base_url in CLOUD_CODE_BASE_URLS {
+        let res = client
+            .post(format!("{}{}", base_url, LOAD_CODE_ASSIST_PATH))
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", access_token))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::USER_AGENT, crate::constants::USER_AGENT.as_str())
+            .json(&meta)
+            .send()
+            .await;
 
-    match res {
-        Ok(res) => {
-            if res.status().is_success() {
-                if let Ok(data) = res.json::<LoadProjectResponse>().await {
-                    let project_id = data.project_id.clone();
-                    
-                    // Core logic: Priority to subscription ID from paid_tier, which better reflects actual account benefits than current_tier
-                    let subscription_tier = data.paid_tier
-                        .and_then(|t| t.id)
-                        .or_else(|| data.current_tier.and_then(|t| t.id));
-                    
-                    if let Some(ref tier) = subscription_tier {
-                        crate::modules::logger::log_info(&format!(
-                            "📊 [{}] Subscription identified successfully: {}", email, tier
-                        ));
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    match res.json::<LoadProjectResponse>().await {
+                        Ok(data) => {
+                            subscription_tier = data
+                                .paid_tier
+                                .and_then(|t| t.id)
+                                .or_else(|| data.current_tier.and_then(|t| t.id))
+                                .or(subscription_tier);
+
+                            if let Some(ref tier) = subscription_tier {
+                                crate::modules::logger::log_info(&format!(
+                                    "📊 [{}] Subscription identified successfully: {}", email, tier
+                                ));
+                            }
+
+                            if let Some(project_id) = extract_project_id(data.project.as_ref()) {
+                                return (Some(project_id), subscription_tier);
+                            }
+                            crate::modules::logger::log_warn(&format!(
+                                "⚠️  [{}] loadCodeAssist succeeded at {} but project_id is missing",
+                                email, base_url
+                            ));
+                        }
+                        Err(e) => {
+                            crate::modules::logger::log_warn(&format!(
+                                "⚠️  [{}] loadCodeAssist parse failed at {}: {}",
+                                email, base_url, e
+                            ));
+                        }
                     }
-                    
-                    return (project_id, subscription_tier);
+                } else {
+                    crate::modules::logger::log_warn(&format!(
+                        "⚠️  [{}] loadCodeAssist failed at {}: Status {}",
+                        email, base_url, res.status()
+                    ));
                 }
-            } else {
+            }
+            Err(e) => {
                 crate::modules::logger::log_warn(&format!(
-                    "⚠️  [{}] loadCodeAssist failed: Status: {}", email, res.status()
+                    "⚠️  [{}] loadCodeAssist network error at {}: {}",
+                    email, base_url, e
                 ));
             }
         }
-        Err(e) => {
-            crate::modules::logger::log_error(&format!("❌ [{}] loadCodeAssist network error: {}", email, e));
-        }
     }
     
-    (None, None)
+    (None, subscription_tier)
 }
 
 /// Unified entry point for fetching account quota
@@ -140,19 +187,20 @@ pub async fn fetch_quota_with_cache(
         fetch_project_id(access_token, email, account_id).await
     };
     
-    let final_project_id = project_id.as_deref().unwrap_or("bamboo-precept-lgxtn");
+    let final_project_id = project_id.unwrap_or_else(generate_fallback_project_id);
     
     let client = create_client(account_id).await;
     let payload = json!({
         "project": final_project_id
     });
-    
-    let url = QUOTA_API_URL;
+
     let mut last_error: Option<AppError> = None;
 
     for attempt in 1..=MAX_RETRIES {
+        let endpoint_index = ((attempt - 1) as usize) % CLOUD_CODE_BASE_URLS.len();
+        let url = format!("{}{}", CLOUD_CODE_BASE_URLS[endpoint_index], QUOTA_API_PATH);
         match client
-            .post(url)
+            .post(&url)
             .bearer_auth(access_token)
             .header(reqwest::header::USER_AGENT, crate::constants::USER_AGENT.as_str())
             .json(&json!(payload))
@@ -164,8 +212,15 @@ pub async fn fetch_quota_with_cache(
                 if let Err(_) = response.error_for_status_ref() {
                     let status = response.status();
                     
-                    // ✅ Special handling for 403 Forbidden - return directly, no retry
+                    // 403 优先切换端点重试，最后一次才标记账号为 forbidden
                     if status == reqwest::StatusCode::FORBIDDEN {
+                        if attempt < MAX_RETRIES {
+                            crate::modules::logger::log_warn(&format!(
+                                "API 403 at {}, trying next endpoint (Attempt {}/{})",
+                                url, attempt, MAX_RETRIES
+                            ));
+                            continue;
+                        }
                         crate::modules::logger::log_warn(&format!(
                             "Account unauthorized (403 Forbidden), marking as forbidden"
                         ));
@@ -267,7 +322,7 @@ pub async fn get_valid_token_for_warmup(account: &crate::models::account::Accoun
     
     // Fetch project_id
     let (project_id, _) = fetch_project_id(&account.token.access_token, &account.email, Some(&account.id)).await;
-    let final_pid = project_id.unwrap_or_else(|| "bamboo-precept-lgxtn".to_string());
+    let final_pid = project_id.unwrap_or_else(generate_fallback_project_id);
     
     Ok((account.token.access_token, final_pid))
 }
