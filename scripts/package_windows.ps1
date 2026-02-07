@@ -44,6 +44,9 @@ if (-not $SkipInstall) {
     npm ci
 }
 npm run tauri build
+if ($LASTEXITCODE -ne 0) {
+    throw "tauri build failed with exit code $LASTEXITCODE"
+}
 
 Write-Host "[3/6] Locating Windows executable..."
 $exe = Get-ChildItem -Path "src-tauri/target" -Filter "antigravity_tools.exe" -Recurse |

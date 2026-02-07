@@ -187,7 +187,7 @@ pub async fn fetch_quota_with_cache(
         fetch_project_id(access_token, email, account_id).await
     };
     
-    let final_project_id = project_id.unwrap_or_else(generate_fallback_project_id);
+    let final_project_id = project_id.clone().unwrap_or_else(generate_fallback_project_id);
     
     let client = create_client(account_id).await;
     let payload = json!({
