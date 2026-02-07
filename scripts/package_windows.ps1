@@ -43,7 +43,7 @@ Write-Host "[2/6] Building frontend + Tauri app..."
 if (-not $SkipInstall) {
     npm ci
 }
-npm run tauri build
+npm run tauri build -- --config src-tauri/tauri.windows-package.conf.json
 if ($LASTEXITCODE -ne 0) {
     throw "tauri build failed with exit code $LASTEXITCODE"
 }
